@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Search, MapPin, AlertCircle } from 'lucide-react';
 import { scrapeZillowData, scrapeFloodData } from '../services/scraperService';
+import { getAddressSuggestions, reverseGeocode, AddressSuggestion } from '../services/geocodingService';
 import { PropertyReport } from '../types/property';
 
 /**
@@ -21,6 +22,138 @@ export default function PropertyAnalyzer() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<PropertyReport | null>(null);
+
+  // Address autocomplete state
+  const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+
+  // Debounce timers for geocoding
+  const addressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const coordsTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Fetch address suggestions as user types
+   */
+  useEffect(() => {
+    // Clear existing timer
+    if (addressTimerRef.current) {
+      clearTimeout(addressTimerRef.current);
+    }
+
+    // Don't fetch suggestions if address is empty
+    if (!address.trim()) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    // Debounce suggestion fetching by 500ms
+    addressTimerRef.current = setTimeout(async () => {
+      const results = await getAddressSuggestions(address, 5);
+      setSuggestions(results);
+      setShowSuggestions(results.length > 0);
+      setSelectedSuggestionIndex(-1);
+    }, 500);
+
+    return () => {
+      if (addressTimerRef.current) {
+        clearTimeout(addressTimerRef.current);
+      }
+    };
+  }, [address]);
+
+  /**
+   * Auto-fill address when coordinates change
+   */
+  useEffect(() => {
+    // Clear existing timer
+    if (coordsTimerRef.current) {
+      clearTimeout(coordsTimerRef.current);
+    }
+
+    // Don't reverse geocode if either coordinate is empty
+    if (!latitude.trim() || !longitude.trim()) {
+      return;
+    }
+
+    const lat = parseFloat(latitude);
+    const lng = parseFloat(longitude);
+
+    // Don't reverse geocode if coordinates are invalid
+    if (isNaN(lat) || isNaN(lng)) {
+      return;
+    }
+
+    // Debounce reverse geocoding by 1 second
+    coordsTimerRef.current = setTimeout(async () => {
+      const result = await reverseGeocode(lat, lng);
+      if (result) {
+        setAddress(result);
+      }
+    }, 1000);
+
+    return () => {
+      if (coordsTimerRef.current) {
+        clearTimeout(coordsTimerRef.current);
+      }
+    };
+  }, [latitude, longitude]);
+
+  /**
+   * Handle suggestion selection from dropdown
+   */
+  const handleSelectSuggestion = (suggestion: AddressSuggestion) => {
+    setAddress(suggestion.display_name);
+    setLatitude(suggestion.lat.toString());
+    setLongitude(suggestion.lon.toString());
+    setShowSuggestions(false);
+    setSuggestions([]);
+  };
+
+  /**
+   * Handle keyboard navigation in suggestions dropdown
+   */
+  const handleAddressKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSuggestions || suggestions.length === 0) return;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setSelectedSuggestionIndex((prev) =>
+          prev < suggestions.length - 1 ? prev + 1 : prev
+        );
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setSelectedSuggestionIndex((prev) => (prev > 0 ? prev - 1 : -1));
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (selectedSuggestionIndex >= 0) {
+          handleSelectSuggestion(suggestions[selectedSuggestionIndex]);
+        }
+        break;
+      case 'Escape':
+        setShowSuggestions(false);
+        break;
+    }
+  };
+
+  /**
+   * Close suggestions when clicking outside
+   */
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (suggestionsRef.current && !suggestionsRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   /**
    * Handles form submission and initiates data scraping
@@ -124,16 +257,38 @@ export default function PropertyAnalyzer() {
             >
               Property Address
             </label>
-            <div className="relative">
-              <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+            <div className="relative" ref={suggestionsRef}>
+              <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5 z-10" />
               <input
                 id="address"
                 type="text"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
+                onKeyDown={handleAddressKeyDown}
                 placeholder="Enter street address"
+                autoComplete="off"
                 className="w-full pl-11 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
               />
+
+              {/* Address Suggestions Dropdown */}
+              {showSuggestions && suggestions.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-slate-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {suggestions.map((suggestion, index) => (
+                    <div
+                      key={index}
+                      onClick={() => handleSelectSuggestion(suggestion)}
+                      className={`px-4 py-3 cursor-pointer hover:bg-blue-50 border-b border-slate-100 last:border-b-0 transition-colors ${
+                        index === selectedSuggestionIndex ? 'bg-blue-50' : ''
+                      }`}
+                    >
+                      <div className="flex items-start gap-2">
+                        <MapPin className="w-4 h-4 text-slate-400 mt-1 flex-shrink-0" />
+                        <span className="text-sm text-slate-700">{suggestion.display_name}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
