@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Search, MapPin, AlertCircle } from 'lucide-react';
-import { supabase } from '../lib/supabase';
 import { scrapeZillowData, scrapeFloodData } from '../services/scraperService';
 import { PropertyReport } from '../types/property';
 
@@ -83,21 +82,11 @@ export default function PropertyAnalyzer() {
         property_cost: zillowData.property_cost,
         base_flood_elevation: floodData.base_flood_elevation,
         flood_zone: floodData.flood_zone,
+        created_at: new Date().toISOString(),
       };
 
-      // Save report to database
-      const { data, error: dbError } = await supabase
-        .from('property_reports')
-        .insert(propertyReport)
-        .select()
-        .maybeSingle();
-
-      if (dbError) {
-        throw new Error(`Failed to save report: ${dbError.message}`);
-      }
-
-      // Update UI with report data
-      setReport(data);
+      // Update UI with report data (no database save for now)
+      setReport(propertyReport);
     } catch (err) {
       console.error('Error analyzing property:', err);
       setError(

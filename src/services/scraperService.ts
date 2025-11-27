@@ -12,35 +12,15 @@ import { ZillowData, FloodData } from '../types/property';
  * @returns Promise with square footage and property cost
  */
 export async function scrapeZillowData(address: string): Promise<ZillowData> {
-  try {
-    // Call Edge Function to scrape Zillow data
-    // Edge Functions are required because direct scraping from browser is blocked by CORS
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/scrape-zillow`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ address }),
-    });
+  // Simulate API delay
+  await new Promise(resolve => setTimeout(resolve, 1000));
 
-    if (!response.ok) {
-      throw new Error('Failed to scrape Zillow data');
-    }
-
-    const data = await response.json();
-    return {
-      square_footage: data.square_footage || null,
-      property_cost: data.property_cost || null,
-    };
-  } catch (error) {
-    console.error('Error scraping Zillow data:', error);
-    // Return null values if scraping fails
-    return {
-      square_footage: null,
-      property_cost: null,
-    };
-  }
+  // Return mock data for development
+  console.log('Mock: Scraping Zillow data for:', address);
+  return {
+    square_footage: 2450,
+    property_cost: 385000,
+  };
 }
 
 /**
@@ -53,33 +33,13 @@ export async function scrapeFloodData(
   latitude: number,
   longitude: number
 ): Promise<FloodData> {
-  try {
-    // Call Edge Function to scrape LSU AgCenter flood data
-    // Edge Functions are required because direct scraping from browser is blocked by CORS
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/scrape-flood-data`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ latitude, longitude }),
-    });
+  // Simulate API delay
+  await new Promise(resolve => setTimeout(resolve, 1200));
 
-    if (!response.ok) {
-      throw new Error('Failed to scrape flood data');
-    }
-
-    const data = await response.json();
-    return {
-      base_flood_elevation: data.base_flood_elevation || null,
-      flood_zone: data.flood_zone || null,
-    };
-  } catch (error) {
-    console.error('Error scraping flood data:', error);
-    // Return null values if scraping fails
-    return {
-      base_flood_elevation: null,
-      flood_zone: null,
-    };
-  }
+  // Return mock data for development
+  console.log('Mock: Scraping flood data for coordinates:', latitude, longitude);
+  return {
+    base_flood_elevation: 12.5,
+    flood_zone: 'AE',
+  };
 }
