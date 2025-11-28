@@ -275,7 +275,7 @@ export default function PropertyAnalyzer() {
           <h1 className="text-5xl md:text-6xl font-display font-bold text-primary-950 mb-4">
             Property Elevation Analysis
           </h1>
-          <p className="text-slate-600 text-xl max-w-2xl mx-auto h-8 font-medium">
+          <p className="text-slate-600 text-xl max-w-3xl mx-auto h-8 font-medium">
             {typewriterText}
             <span className="animate-pulse">|</span>
           </p>
